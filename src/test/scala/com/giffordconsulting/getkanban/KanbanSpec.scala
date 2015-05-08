@@ -1,14 +1,11 @@
 package com.giffordconsulting.getkanban
 
-import javafx.stage.Stage
-
-import com.giffordconsulting.getkanban.Phase.AnalysisDone
 import com.giffordconsulting.getkanban.Phase._
 import com.giffordconsulting.getkanban.WorkDay._
 import com.giffordconsulting.getkanban.WorkItems._
 import org.scalatest.BeforeAndAfter
 
-class WorkItemTest extends UnitSpec with BeforeAndAfter {
+class KanbanSpec extends UnitSpec with BeforeAndAfter {
 
   var workItem: WorkItem = Empty
   var wip1: WorkItem = Empty
@@ -24,8 +21,8 @@ class WorkItemTest extends UnitSpec with BeforeAndAfter {
     wip4 = new WorkItem("4", new WorkRemaining(1,1,1), BusinessValue.High, 3, Ready)
   }
 
-  "Day8" should "initialize the board" in {
-    initializeBoard(day9)
+  "Kanban" should "initialize the board" in {
+    new Kanban(day9).initializeBoard()
 
     S1.state should be(ReadyToDeploy)
 
@@ -34,56 +31,60 @@ class WorkItemTest extends UnitSpec with BeforeAndAfter {
     S4.state should be(Test)
 
     S5.state should be(DevDone)
-    S6.state should be(DevInProcess)
-    S7.state should be(DevInProcess)
-    S8.state should be(DevInProcess)
+    S6.state should be(DevInProgress)
+    S7.state should be(DevInProgress)
+    S8.state should be(DevInProgress)
 
     S9.state should be(Phase.AnalysisDone)
-    S10.state should be(AnalysisInProcess)
+    S10.state should be(AnalysisInProgress)
 
     S11.state should be(Ready)
     S12.state should be(Ready)
   }
 
+  it should "play Day 9" in {
+    true should be(false)
+  }
+
   "Ready" should "stay in Ready when Analysis at WIP limit" in {
     val items: Seq[WorkItem] = Seq(workItem, wip1, wip2)
 
-    process(items, Nine)
+    new Kanban(items).process(Nine)
 
     items.length should be(3)
     workItem.state should be(Ready)
-    wip1.state should be(AnalysisInProcess)
-    wip2.state should be(AnalysisInProcess)
+    wip1.state should be(AnalysisInProgress)
+    wip2.state should be(AnalysisInProgress)
   }
 
   it should "move to Analysis In Process" in {
-    process(Seq(workItem), Nine)
-    workItem.state should be (AnalysisInProcess)
+    new Kanban(Seq(workItem)).process(Nine)
+    workItem.state should be (AnalysisInProgress)
   }
   
   "AnalysisDone" should "move to DevInProcess" in {
     workItem.effort.analysis = 0
-    process(Seq(workItem), Ten)
-    workItem.state should be(DevInProcess)
+    new Kanban(Seq(workItem)).process(Ten)
+    workItem.state should be(DevInProgress)
   }
 
   it should "stay in analysisDone when Development at WIP limit" in {
     workItem = buildItem(Phase.AnalysisDone)
 
-    wip1 = buildItem(DevInProcess)
-    wip2 = buildItem(DevInProcess)
-    wip3 = buildItem(DevInProcess)
-    wip4 = buildItem(DevInProcess)
+    wip1 = buildItem(DevInProgress)
+    wip2 = buildItem(DevInProgress)
+    wip3 = buildItem(DevInProgress)
+    wip4 = buildItem(DevInProgress)
 
-    process(Seq(workItem, wip1, wip2, wip3, wip4), Ten)
+    new Kanban(Seq(workItem, wip1, wip2, wip3, wip4)).process(Ten)
 
-    Seq(wip1, wip2,wip3).foreach(_.state should be (DevInProcess))
+    Seq(wip1, wip2,wip3).foreach(_.state should be (DevInProgress))
     workItem.state should be(Phase.AnalysisDone)
   }
 
   "DevelopmentDone" should "move to Testing" in {
     workItem = buildItem(Phase.DevDone)
-    process(Seq(workItem), Ten)
+    new Kanban(Seq(workItem)).process(Ten)
     workItem.state should be (Test)
   }
 
@@ -105,32 +106,32 @@ class WorkItemTest extends UnitSpec with BeforeAndAfter {
     wip4 = buildItem(Test)
     workItem = buildItem(DevDone)
 
-    process(Seq(workItem, wip1,wip2,wip3,wip4), Ten)
+    new Kanban(Seq(workItem, wip1,wip2,wip3,wip4)).process(Ten)
 
     workItem.state should be(DevDone)
   }
 
   "ReadyForDeployment" should "not move to deployed when not a release day" in {
     workItem = buildItem(ReadyToDeploy)
-    process(Seq(workItem), Ten)
+    new Kanban(Seq(workItem)).process(Ten)
     workItem.state should be (ReadyToDeploy)
   }
 
   it should "move to deployed on day 9" in {
     workItem = buildItem(ReadyToDeploy)
-    process(Seq(workItem), Nine)
+    new Kanban(Seq(workItem)).process(Nine)
     workItem.state should be (Deployed)
   }
 
   it should "move to deployed on day 12" in {
     workItem = buildItem(ReadyToDeploy)
-    process(Seq(workItem), Twelve)
+    new Kanban(Seq(workItem)).process(Twelve)
     workItem.state should be (Deployed)
   }
 
   it should "move to deployed on day 15" in {
     workItem = buildItem(ReadyToDeploy)
-    process(Seq(workItem), Fifteen)
+    new Kanban(Seq(workItem)).process(Fifteen)
     workItem.state should be (Deployed)
   }
 }

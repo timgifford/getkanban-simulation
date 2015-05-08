@@ -15,6 +15,11 @@ class WorkItem(val id: String,
                var state:Phase = Ready
                 ) {
 
+  def needsAnalysis = effort.analysis > 0
+  def needsTesting = effort.test > 0
+  def needsDevelopment = effort.development > 0
+
+
   def isReadyForDeployment(): Boolean = effort.analysis == 0 && effort.development == 0 & effort.test == 0
   def isReadyForDev() = effort.analysis == 0 && effort.development > 0
   def isReadyForTesting(): Boolean = effort.analysis == 0 && effort.development == 0 & effort.test > 0
@@ -23,63 +28,7 @@ class WorkItem(val id: String,
 
 object WorkItems {
 
-  private def processItem(item: WorkItem, items: Seq[WorkItem], day: WorkDay): Unit = {
-    val analysisQueue = items.filter(x => x.state == Phase.AnalysisDone || x.state == Phase.AnalysisInProcess)
-    val devQueue = items.filter(x => x.state == Phase.DevInProcess || x.state == Phase.DevDone)
-    val testQueue = items.filter(x => x.state == Phase.Test)
-
-    if (item.effort.analysis > 0 && analysisQueue.length < 2) {
-      item.state = AnalysisInProcess
-    }
-
-    if(item.effort.analysis == 0 ){
-      item.state = Phase.AnalysisDone
-    }
-
-    if (item.effort.analysis == 0 && devQueue.length < 4 || devQueue.contains(item)) {
-      item.state = DevInProcess
-    }
-
-    if(item.effort.development == 0 ){
-      item.state = DevDone
-    }
-
-    if (item.effort.development == 0 && testQueue.length < 3 || testQueue.contains(item)) {
-      item.state = Test
-    }
-    if (item.effort.test == 0) {
-      item.state = ReadyToDeploy
-    }
-    if (day.isDeployDay && item.state == ReadyToDeploy) {
-      item.state = Deployed
-    }
-  }
-
-  def initializeBoard(items: Seq[WorkItem]): Unit = {
-    for(i <- items){
-      processItem(i, items, WorkDay.Eight)
-    }
-  }
-
-  def process(items: Seq[WorkItem], day: WorkDay): Unit = {
-    for(i <- items.reverse){
-      processItem(i, items, day)
-    }
-  }
-
-  object Empty extends WorkItem(id = "Empty", WorkRemaining.none, BusinessValue.Med, 1){
-
-  }
-
-  case object ReadyForDeployment extends WorkItem("ReadyForDeployment", WorkRemaining.none, Low, 4)
-  case object Testing extends WorkItem("Testing", new WorkRemaining(0,0,1), Low, 1)
-  case object DevelopmentDone extends WorkItem("DevDone", new WorkRemaining(0,0,1), Low, 1)
-
-  case object NotStarted extends WorkItem("NotStarted", new WorkRemaining(1,1,1), Low, 1) {
-
-  }
-
-  case object AnalysisDone extends WorkItem("DevelopmentInProcess", new WorkRemaining(0,1,1), Low, 1)
+  object Empty extends WorkItem(id = "Empty", WorkRemaining.none, BusinessValue.Med, 1)
 
   case object  S1 extends WorkItem("S1", WorkRemaining.none, Low, 5)
   case object  S2 extends WorkItem("S2", new WorkRemaining(0, 0, 2), Low, 6)
@@ -105,8 +54,6 @@ object WorkItems {
   case object S22 extends WorkItem("S22", new WorkRemaining(4,4,7), High, 8)
   case object S23 extends WorkItem("S23", new WorkRemaining(5,7,9), Med, 9)
   case object S24 extends WorkItem("S24", new WorkRemaining(5,6,6), Med, 11)
-
-  val all = HashMap("S1" -> S1)
 
   val day9 = Seq(S1, S2, S3, S4, S5, S6, S7, S8, S9, S10, S11)
 }
