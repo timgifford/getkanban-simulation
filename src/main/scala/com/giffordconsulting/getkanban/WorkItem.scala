@@ -26,6 +26,7 @@ class WorkItem(val id: String,
   override def toString: String = this.getClass.getSimpleName + "[" + id + "]"
 }
 
+
 object WorkItems {
 
   object Empty extends WorkItem(id = "Empty", WorkRemaining.none, BusinessValue.Med, 1)

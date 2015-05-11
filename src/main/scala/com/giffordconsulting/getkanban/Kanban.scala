@@ -16,7 +16,7 @@ class Kanban(var items: Seq[WorkItem] = Seq()) {
   }
 
   def processItem(item: WorkItem, day: WorkDay): Unit = {
-    if (item.needsAnalysis && spaceAvailableInAnalysis()) {
+    if (item.needsAnalysis && spaceAvailableInAnalysis(item)) {
       item.state = AnalysisInProgress
     }
     if(!item.needsAnalysis){
@@ -47,7 +47,7 @@ class Kanban(var items: Seq[WorkItem] = Seq()) {
     (testQueue.length < 3 || testQueue.contains(item))
   }
 
-  def spaceAvailableInAnalysis(): Boolean = {
+  def spaceAvailableInAnalysis(item: WorkItem): Boolean = {
     analysisQueue.length < 2
   }
 
