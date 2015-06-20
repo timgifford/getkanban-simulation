@@ -2,11 +2,6 @@ package com.giffordconsulting.getkanban
 
 import com.giffordconsulting.getkanban.BusinessValue._
 import com.giffordconsulting.getkanban.Phase._
-import com.giffordconsulting.getkanban.WorkDay.Ten
-
-import scala.collection.immutable.HashMap
-
-
 
 class WorkItem(val id: String,
                val effort: WorkRemaining = WorkRemaining.none,

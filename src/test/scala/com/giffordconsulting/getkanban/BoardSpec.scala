@@ -9,7 +9,76 @@ class BoardSpec extends UnitSpec {
     board.cards.head.state should be (Ready)
   }
 
-  
+  "playTesting" should "advance tested cards to ReadyForDeployment" in {
+    val initialCards: Seq[StoryCard] = Seq(StoryCard(0, 0, 2, Test), StoryCard(0, 0, 1, Test))
+    val boardWithTestingWorkApplied: Board = Board(initialCards)
+      .playTesting(2)
+
+    boardWithTestingWorkApplied.cards(0).state should be (ReadyToDeploy)
+    boardWithTestingWorkApplied.cards(1).state should be (Test)
+  }
+  it should "have same number of cards when more points played than are remaining" in {
+    val initialCards: Seq[StoryCard] = Seq(StoryCard(0, 0, 2, Test), StoryCard(0, 0, 1, Test))
+    val boardWithTestingWorkApplied: Board = Board(initialCards)
+      .playTesting(10)
+
+    boardWithTestingWorkApplied.cards.size should be (initialCards.size)
+  }
+
+
+  "playDev" should "advance development to testing" in {
+    val initialCards: Seq[StoryCard] = Seq(StoryCard(0, 2, 2, DevInProgress), StoryCard(0, 2, 2, DevInProgress))
+    val boardWithDevWorkApplied = Board(initialCards)
+      .playDev(4)
+
+    boardWithDevWorkApplied.cards(0).state should be (Test)
+    boardWithDevWorkApplied.cards(1).state should be (Test)
+  }
+
+  it should "have same number of cards when more points played than are remaining" in {
+    val initialCards: Seq[StoryCard] = Seq(StoryCard(0, 2, 2, DevInProgress), StoryCard(0, 2, 2, DevInProgress))
+    val boardWithDevWorkApplied = Board(initialCards)
+      .playDev(10)
+
+    boardWithDevWorkApplied.cards.size should be (initialCards.size)
+  }
+
+  "playAnalysis" should "advance analysis to development" in {
+    val initialCards: Seq[StoryCard] = Seq(StoryCard(2, 2, 2, AnalysisInProgress), StoryCard(2, 2, 2, AnalysisInProgress))
+    val boardWithWorkApplied = Board(initialCards)
+      .playAnalysis(4)
+
+
+    boardWithWorkApplied.cards(0).state should be (DevInProgress)
+    boardWithWorkApplied.cards(1).state should be (DevInProgress)
+  }
+
+  it should "have same number of cards when more points played than are remaining" in {
+    val initialCards: Seq[StoryCard] = Seq(StoryCard(2, 2, 2, AnalysisInProgress), StoryCard(2, 2, 2, AnalysisInProgress))
+    val boardWithWorkApplied = Board(initialCards)
+      .playAnalysis(10)
+
+    boardWithWorkApplied.cards.size should be (initialCards.size)
+  }
+
+  "Play" should "only apply points to current analysis queued items" in {
+    val board: Board = Board(Seq(StoryCard(2,2,2,AnalysisInProgress))).play(new Points(5,5,5))
+
+    board.cards.head.state should be (DevInProgress)
+  }
+
+  it should "only apply points to current development queued items" in {
+    val board: Board = Board(Seq(StoryCard(0,2,2, DevInProgress))).play(new Points(5,5,5))
+
+    board.cards.head.state should be (Test)
+    board.remainingPoints should be(new Points(5,3,5))
+  }
+
+  it should "only apply points to current test queued items" in {
+    val board: Board = Board(Seq(StoryCard(0,0,2, Test))).play(new Points(5,5,5))
+
+    board.cards.head.state should be (ReadyToDeploy)
+  }
 
   "Add" should "advance to DevInProgress for a story without analysis work" in {
     val devInProgress: StoryCard = new StoryCard(0, 5, 5)
@@ -20,7 +89,9 @@ class BoardSpec extends UnitSpec {
   }
 
   it should "not allow more than 4 in Ready" in {
-    var board: Board = Board(Seq(StoryCard(1,0,0, AnalysisInProgress), StoryCard(1,0,0, AnalysisInProgress)))
+    var board: Board = Board(Seq(
+      StoryCard(1,0,0, AnalysisInProgress),
+      StoryCard(1,0,0, AnalysisInProgress)))
 
     // Add 4 Ready items
     for(i <- 1 to 4) board = board.add(StoryCard(1,1,1))
@@ -79,7 +150,7 @@ class BoardSpec extends UnitSpec {
     }
   }
 
-  it should "puts lastt item on head" in {
+  it should "puts last item on head" in {
     var board = Board()
       .add(StoryCard(0, 0, 1)) // Tail
 
@@ -148,39 +219,7 @@ class BoardSpec extends UnitSpec {
   }
 }
 
-case class StoryCard(val analysisRemaining: Int, val developmentRemaining: Int, val testingRemaining: Int, val state: Phase = Ready) {
-  def candidateState: Phase = this match {
-    case StoryCard(0, 0, 0, _) => ReadyToDeploy
-    case StoryCard(0, 0, _, _) => Test
-    case StoryCard(0, _, _, _) => DevInProgress
-    case _ => AnalysisInProgress
-  }
 
-  def advance(board: Board): StoryCard = this match {
-    case c if c.candidateState == AnalysisInProgress && board.allowAnalysisWork => this.copy(state = AnalysisInProgress)
-    case c if c.candidateState == DevInProgress && c.state < DevInProgress && !board.allowDevelopmentWork => this.copy(state = AnalysisDone)
-    case c if c.candidateState == DevInProgress && board.allowDevelopmentWork => this.copy(state = DevInProgress)
-    case c if c.candidateState == Test && c.state < Test && !board.allowTestingWork => this.copy(state = DevDone)
-    case c if c.candidateState == Test => this.copy(state = Test)
-    case c if c.candidateState == ReadyToDeploy => this.copy(state = ReadyToDeploy)
-    case _ => this
-  }
-}
 
-case class Board(val cards: Seq[StoryCard] = Seq.empty) {
-  def allowReadyWork = 4 > cards.count(c => c.state == Ready)
-  def allowAnalysisWork = 2 > cards.count(c => c.state == AnalysisInProgress || c.state == AnalysisDone)
-  def allowDevelopmentWork = 4 > cards.count(c => c.state == DevInProgress || c.state == DevDone)
-  def allowTestingWork = 3 > cards.count(c => c.state == Test)
-  def isBoardFull = {cards.count(c => c.state < ReadyToDeploy) == 13}
 
-  def add(card: StoryCard): Board = card match {
-    case s if s.state != Ready => throw new IllegalArgumentException("Only add 'Ready' stories")
-    case _ => {
-      if(!allowReadyWork) throw new IllegalArgumentException("Board is full")
-      val newCards: Seq[StoryCard] = card +: cards
-      Board(newCards.map(_.advance(this)))
-    }
-  }
-}
 
