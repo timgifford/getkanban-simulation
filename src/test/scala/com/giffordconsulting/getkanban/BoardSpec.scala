@@ -1,16 +1,25 @@
 package com.giffordconsulting.getkanban
 
 import com.giffordconsulting.getkanban.Phase._
+import com.giffordconsulting.getkanban.StoryCard._
 
 class BoardSpec extends UnitSpec {
+
+  val cardInTest: StoryCard = StoryCard(0, 0, 1, state = Test)
+  val readyToDeployCard: StoryCard = StoryCard(0, 0, 0, state = ReadyToDeploy)
 
   "New board" should "not advance cards" in {
     val board = Board(Seq(StoryCard(0,0,0)))
     board.cards.head.state should be (Ready)
   }
 
+  it should "start on day 9" in {
+    val board = Board(Seq(StoryCard(0,0,0)))
+    board.day should be (WorkDay(9))
+  }
+
   "playTesting" should "advance tested cards to ReadyForDeployment" in {
-    val initialCards: Seq[StoryCard] = Seq(StoryCard(0, 0, 2, Test), StoryCard(0, 0, 1, Test))
+    val initialCards: Seq[StoryCard] = Seq(StoryCard(0, 0, 2, state=Test), cardInTest)
     val boardWithTestingWorkApplied: Board = Board(initialCards)
       .playTesting(2)
 
@@ -18,7 +27,7 @@ class BoardSpec extends UnitSpec {
     boardWithTestingWorkApplied.cards(1).state should be (Test)
   }
   it should "have same number of cards when more points played than are remaining" in {
-    val initialCards: Seq[StoryCard] = Seq(StoryCard(0, 0, 2, Test), StoryCard(0, 0, 1, Test))
+    val initialCards: Seq[StoryCard] = Seq(StoryCard(0, 0, 2, state=Test), cardInTest)
     val boardWithTestingWorkApplied: Board = Board(initialCards)
       .playTesting(10)
 
@@ -27,7 +36,7 @@ class BoardSpec extends UnitSpec {
 
 
   "playDev" should "advance development to testing" in {
-    val initialCards: Seq[StoryCard] = Seq(StoryCard(0, 2, 2, DevInProgress), StoryCard(0, 2, 2, DevInProgress))
+    val initialCards: Seq[StoryCard] = Seq(StoryCard(0, 2, 2, state=DevInProgress), StoryCard(0, 2, 2, state=DevInProgress))
     val boardWithDevWorkApplied = Board(initialCards)
       .playDev(4)
 
@@ -36,7 +45,7 @@ class BoardSpec extends UnitSpec {
   }
 
   it should "have same number of cards when more points played than are remaining" in {
-    val initialCards: Seq[StoryCard] = Seq(StoryCard(0, 2, 2, DevInProgress), StoryCard(0, 2, 2, DevInProgress))
+    val initialCards: Seq[StoryCard] = Seq(StoryCard(0, 2, 2, state=DevInProgress), StoryCard(0, 2, 2, state=DevInProgress))
     val boardWithDevWorkApplied = Board(initialCards)
       .playDev(10)
 
@@ -44,7 +53,7 @@ class BoardSpec extends UnitSpec {
   }
 
   "playAnalysis" should "advance analysis to development" in {
-    val initialCards: Seq[StoryCard] = Seq(StoryCard(2, 2, 2, AnalysisInProgress), StoryCard(2, 2, 2, AnalysisInProgress))
+    val initialCards: Seq[StoryCard] = Seq(StoryCard(2, 2, 2, state=AnalysisInProgress), StoryCard(2, 2, 2, state=AnalysisInProgress))
     val boardWithWorkApplied = Board(initialCards)
       .playAnalysis(4)
 
@@ -54,7 +63,7 @@ class BoardSpec extends UnitSpec {
   }
 
   it should "have same number of cards when more points played than are remaining" in {
-    val initialCards: Seq[StoryCard] = Seq(StoryCard(2, 2, 2, AnalysisInProgress), StoryCard(2, 2, 2, AnalysisInProgress))
+    val initialCards: Seq[StoryCard] = Seq(StoryCard(2, 2, 2, state=AnalysisInProgress), StoryCard(2, 2, 2, state=AnalysisInProgress))
     val boardWithWorkApplied = Board(initialCards)
       .playAnalysis(10)
 
@@ -62,22 +71,48 @@ class BoardSpec extends UnitSpec {
   }
 
   "Play" should "only apply points to current analysis queued items" in {
-    val board: Board = Board(Seq(StoryCard(2,2,2,AnalysisInProgress))).play(new Points(5,5,5))
+    val board: Board = Board(Seq(StoryCard(2,2,2,state=AnalysisInProgress))).play(Points(5,5,5))
 
     board.cards.head.state should be (DevInProgress)
   }
 
   it should "only apply points to current development queued items" in {
-    val board: Board = Board(Seq(StoryCard(0,2,2, DevInProgress))).play(new Points(5,5,5))
+    val board: Board = Board(Seq(StoryCard(0,2,2, state=DevInProgress))).play(Points(5,5,5))
 
     board.cards.head.state should be (Test)
-    board.remainingPoints should be(new Points(5,3,5))
+    board.remainingPoints should be(Points(5,3,5))
   }
 
   it should "only apply points to current test queued items" in {
-    val board: Board = Board(Seq(StoryCard(0,0,2, Test))).play(new Points(5,5,5))
+    val board: Board = Board(Seq(StoryCard(0,0,2, state=Test)), day=WorkDay(10)).play(Points(5,5,5))
 
+    board.day should be (WorkDay(11))
     board.cards.head.state should be (ReadyToDeploy)
+  }
+
+  it should "puts board to day 10 after first day" in {
+    val board = Board(Seq(readyToDeployCard)).play(Points(5,5,5))
+    board.day should be (WorkDay(10))
+  }
+
+  it should "deploy items on day 9" in {
+    val board = Board(Seq(readyToDeployCard), day=WorkDay(9)).play(Points(5,5,5))
+    board.cards.head.state should be (Deployed)
+  }
+
+  it should "deploy items on day 12" in {
+    val board = Board(Seq(readyToDeployCard), day=WorkDay(12)).play(Points(5,5,5))
+    board.cards.head.state should be (Deployed)
+  }
+
+  it should "deploy items on day 15" in {
+    val board = Board(Seq(readyToDeployCard), day=WorkDay(15)).play(Points(5,5,5))
+    board.cards.head.state should be (Deployed)
+  }
+
+  it should "work with empty board" in {
+    val board = Board().play(Points(5,5,5))
+    board.cards should be(empty)
   }
 
   "Add" should "advance to DevInProgress for a story without analysis work" in {
@@ -90,8 +125,8 @@ class BoardSpec extends UnitSpec {
 
   it should "not allow more than 4 in Ready" in {
     var board: Board = Board(Seq(
-      StoryCard(1,0,0, AnalysisInProgress),
-      StoryCard(1,0,0, AnalysisInProgress)))
+      StoryCard(1,0,0, state=AnalysisInProgress),
+      StoryCard(1,0,0, state=AnalysisInProgress)))
 
     // Add 4 Ready items
     for(i <- 1 to 4) board = board.add(StoryCard(1,1,1))
@@ -104,7 +139,8 @@ class BoardSpec extends UnitSpec {
   }
 
   it should "maintain at Ready when Analysis at wip limit" in {
-    val fillAnalysis: Seq[StoryCard] = Seq(StoryCard(1, 1, 1, AnalysisInProgress), StoryCard(1, 1, 1, AnalysisInProgress))
+    val cardInAnalysis: StoryCard = StoryCard(1, 1, 1, state=AnalysisInProgress)
+    val fillAnalysis: Seq[StoryCard] = Seq(cardInAnalysis, cardInAnalysis)
     val board: Board = Board(fillAnalysis).add(StoryCard(1, 1, 1))
 
     board.cards.head.state should be (Ready)
@@ -112,7 +148,8 @@ class BoardSpec extends UnitSpec {
   }
 
   it should "maintain at AnalysisDone state when Development at wip limit" in {
-    val fillDevelopment: Seq[StoryCard] = Seq(StoryCard(0, 5, 5, DevInProgress), StoryCard(0, 5, 5, DevInProgress), StoryCard(0, 5, 5, DevInProgress), StoryCard(0, 5, 5, DevInProgress))
+    val cardInDevelopment: StoryCard = StoryCard(0, 5, 5, state = DevInProgress)
+    val fillDevelopment: Seq[StoryCard] = Seq(cardInDevelopment, cardInDevelopment, cardInDevelopment, cardInDevelopment)
     val board: Board = Board(fillDevelopment).add(StoryCard(0, 5, 5))
 
     board.cards.head.state should be(AnalysisDone)
@@ -127,7 +164,8 @@ class BoardSpec extends UnitSpec {
 
 
   it should "maintain at DevelopmentDone when Testing at wip limit" in {
-    val fillTests: Seq[StoryCard] = Seq(StoryCard(0, 0, 1, Test), StoryCard(0, 0, 1, Test), StoryCard(0, 0, 1, Test))
+    val cardInTesting: StoryCard = cardInTest
+    val fillTests: Seq[StoryCard] = Seq(cardInTesting, cardInTesting, cardInTesting)
     val board: Board = Board(fillTests).add(StoryCard(0, 0, 1))
 
     board.cards.head.state should be (DevDone)
@@ -164,19 +202,6 @@ class BoardSpec extends UnitSpec {
   }
 
   it should "initiialize the board" in {
-    val s1 = StoryCard(0, 0, 0)
-    val s2 = StoryCard(0, 0, 2)
-    val s3 = StoryCard(0, 0, 9)
-    val s4 = StoryCard(0, 0, 4)
-    val s5 = StoryCard(0, 0, 6)
-    val s6 = StoryCard(0, 7, 8)
-    val s7 = StoryCard(0, 9, 10)
-    val s8 = StoryCard(0, 5, 9)
-    val s9 = StoryCard(0, 6, 10)
-    val s10 = StoryCard(6, 5, 11)
-    val s11 = StoryCard(3, 4, 9)
-    val s12 = StoryCard(7, 8, 11)
-
     var board = Board()
     for (card <- Seq(s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12)) {
       board = board.add(card)
