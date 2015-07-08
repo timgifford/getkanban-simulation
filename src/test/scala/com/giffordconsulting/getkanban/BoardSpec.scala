@@ -1,7 +1,60 @@
 package com.giffordconsulting.getkanban
 
+import com.giffordconsulting.getkanban.BusinessValue._
 import com.giffordconsulting.getkanban.Phase._
 import com.giffordconsulting.getkanban.StoryCard._
+
+class LowestRemainingEffortFirstSpec extends UnitSpec {
+
+  "LowestRemainingWork" should "sort using current phase" in {
+    val list = Seq(
+    StoryCard(0,0,2,state = Test, name = "test2"),
+    StoryCard(0,0,1,state = Test, name = "test1"),
+    StoryCard(0,0,20,state = DevDone, name = "dev2"),
+    StoryCard(0,0,10,state = DevDone, name = "dev1")
+    )
+
+    val sorted: Seq[StoryCard] = list.sorted(new LowestRemainingEffortFirst)
+    sorted.groupBy(x => x.state).get(Test).get(0).name should be ("test1")
+
+  }
+
+  "Strategy" should "sort lowest remaining effort first" in {
+    val lowTestEffort = StoryCard(0, 0, 2, Low, 6, Test)
+    val highTestEffort = StoryCard(0, 0, 9, Med, 10, Test)
+    val highDevEffort = StoryCard(0,100,5,High, 100, DevInProgress)
+    val medDevEffort = StoryCard(0,5,5,High, 100, DevInProgress)
+    val cards: Seq[StoryCard] = Seq(highTestEffort, lowTestEffort, highDevEffort, medDevEffort)
+    val board = Board(cards, strategy = new LowestRemainingEffortFirst())
+
+    board.cardsInPhase(DevInProgress).head should be (medDevEffort)
+    board.cardsInPhase(DevInProgress).last should be (highDevEffort)
+
+    board.cardsInPhase(Test).head should be(lowTestEffort)
+    board.cardsInPhase(Test).last should be(highTestEffort)
+  }
+
+}
+
+class BusinessValueStrategySpec extends UnitSpec {
+
+  "Strategy" should "sort cards using business value" in {
+    val low = StoryCard(0, 0, 2, Low, 6, Test)
+    val med = StoryCard(0, 0, 9, Med, 10, Test)
+    val highDev = StoryCard(0,5,5,High, 100, DevInProgress)
+    val cards: Seq[StoryCard] = Seq(low, highDev, med)
+    val board = Board(cards, strategy = new BusinessValueStrategy())
+
+    board.cardsInPhase(DevInProgress).head should be (highDev)
+
+    board.cardsInPhase(Test).head should be(med)
+    board.cardsInPhase(Test).last should be(low)
+  }
+}
+
+
+
+
 
 class BoardSpec extends UnitSpec {
 
@@ -13,9 +66,11 @@ class BoardSpec extends UnitSpec {
     board.cards.head.state should be (Ready)
   }
 
+
+
   it should "start on day 9" in {
     val board = Board(Seq(StoryCard(0,0,0)))
-    board.day should be (WorkDay(9))
+    board.day should be (WorkDay.Nine)
   }
 
   "playTesting" should "advance tested cards to ReadyForDeployment" in {
@@ -26,6 +81,13 @@ class BoardSpec extends UnitSpec {
     boardWithTestingWorkApplied.cards(0).state should be (ReadyToDeploy)
     boardWithTestingWorkApplied.cards(1).state should be (Test)
   }
+
+  it should "apply points using the prioritization strategy" in {
+    val initialCards: Seq[StoryCard] = Seq(StoryCard(0, 0, 1, state=Test, businessValue = Low, name="low"), StoryCard(0, 0, 1, state=Test, businessValue = High, name="high"))
+    val boardWithTestingWorkApplied: Board = Board(initialCards,strategy = new BusinessValueStrategy).playTesting(1)
+    boardWithTestingWorkApplied.cards.head.name should be ("high")
+  }
+
   it should "have same number of cards when more points played than are remaining" in {
     val initialCards: Seq[StoryCard] = Seq(StoryCard(0, 0, 2, state=Test), cardInTest)
     val boardWithTestingWorkApplied: Board = Board(initialCards)
@@ -80,33 +142,33 @@ class BoardSpec extends UnitSpec {
     val board: Board = Board(Seq(StoryCard(0,2,2, state=DevInProgress))).play(Points(5,5,5))
 
     board.cards.head.state should be (Test)
-    board.remainingPoints should be(Points(5,3,5))
+    board.unplayedPoints should be(Points(5,3,5))
   }
 
   it should "only apply points to current test queued items" in {
-    val board: Board = Board(Seq(StoryCard(0,0,2, state=Test)), day=WorkDay(10)).play(Points(5,5,5))
+    val board: Board = Board(Seq(StoryCard(0,0,2, state=Test)), day=WorkDay.Ten).play(Points(5,5,5))
 
-    board.day should be (WorkDay(11))
+    board.day should be (WorkDay.Eleven)
     board.cards.head.state should be (ReadyToDeploy)
   }
 
   it should "puts board to day 10 after first day" in {
     val board = Board(Seq(readyToDeployCard)).play(Points(5,5,5))
-    board.day should be (WorkDay(10))
+    board.day should be (WorkDay.Ten)
   }
 
   it should "deploy items on day 9" in {
-    val board = Board(Seq(readyToDeployCard), day=WorkDay(9)).play(Points(5,5,5))
+    val board = Board(Seq(readyToDeployCard), day=WorkDay.Nine).play(Points(5,5,5))
     board.cards.head.state should be (Deployed)
   }
 
   it should "deploy items on day 12" in {
-    val board = Board(Seq(readyToDeployCard), day=WorkDay(12)).play(Points(5,5,5))
+    val board = Board(Seq(readyToDeployCard), day=WorkDay.Twelve).play(Points(5,5,5))
     board.cards.head.state should be (Deployed)
   }
 
   it should "deploy items on day 15" in {
-    val board = Board(Seq(readyToDeployCard), day=WorkDay(15)).play(Points(5,5,5))
+    val board = Board(Seq(readyToDeployCard), day=WorkDay.Fifteen).play(Points(5,5,5))
     board.cards.head.state should be (Deployed)
   }
 
@@ -122,6 +184,7 @@ class BoardSpec extends UnitSpec {
     board.cards(0).candidateState should be(DevInProgress)
     board.cards(0).state should be(DevInProgress)
   }
+
 
   it should "not allow more than 4 in Ready" in {
     var board: Board = Board(Seq(
@@ -143,8 +206,8 @@ class BoardSpec extends UnitSpec {
     val fillAnalysis: Seq[StoryCard] = Seq(cardInAnalysis, cardInAnalysis)
     val board: Board = Board(fillAnalysis).add(StoryCard(1, 1, 1))
 
-    board.cards.head.state should be (Ready)
-    board.cards.tail.foreach(c => c.state should be (AnalysisInProgress))
+    board.cards.last.state should be (Ready)
+//    board.cards.tail.foreach(c => c.state should be (AnalysisInProgress))
   }
 
   it should "maintain at AnalysisDone state when Development at wip limit" in {
@@ -152,9 +215,8 @@ class BoardSpec extends UnitSpec {
     val fillDevelopment: Seq[StoryCard] = Seq(cardInDevelopment, cardInDevelopment, cardInDevelopment, cardInDevelopment)
     val board: Board = Board(fillDevelopment).add(StoryCard(0, 5, 5))
 
-    board.cards.head.state should be(AnalysisDone)
-
-    board.cards.tail.foreach(c => c.state should be (DevInProgress))
+    board.cards.last.state should be(AnalysisDone)
+    board.cards.init.foreach(c => c.state should be (DevInProgress))
   }
 
   it should "move second item to AnaysisInProgress" in {
@@ -168,8 +230,8 @@ class BoardSpec extends UnitSpec {
     val fillTests: Seq[StoryCard] = Seq(cardInTesting, cardInTesting, cardInTesting)
     val board: Board = Board(fillTests).add(StoryCard(0, 0, 1))
 
-    board.cards.head.state should be (DevDone)
-    board.cards.tail.foreach(c => c.state should be (Test))
+    board.cards.last.state should be (DevDone)
+    board.cards.init.foreach(c => c.state should be (Test))
   }
 
   it should "advance to ReadyToDeploy when no work remains" in {
@@ -188,43 +250,36 @@ class BoardSpec extends UnitSpec {
     }
   }
 
-  it should "puts last item on head" in {
+  it should "puts last item on tail" in {
     var board = Board()
-      .add(StoryCard(0, 0, 1)) // Tail
+      .add(StoryCard(0, 0, 1)) // Head
 
     board.cards.head.analysisRemaining should be(0)
     board.cards.head.state should be (Test)
 
     board = board.add(StoryCard(1, 1, 1))
     board.cards.length should be (2)
-    board.cards.head.analysisRemaining should be(1)
-    board.cards.head.state should be (AnalysisInProgress)
+    board.cards.last.analysisRemaining should be(1)
+    board.cards.last.state should be (AnalysisInProgress)
   }
 
   it should "initiialize the board" in {
-    var board = Board()
-    for (card <- Seq(s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12)) {
-      board = board.add(card)
-    }
+    val board = Board.startingLayout(new FirstInFirstOut())
 
     board.cards.length should be(12)
 
-    board.cards(0).state should be(Ready)
-    board.cards(1).state should be(Ready)
-
-    board.cards(2).state should be(AnalysisInProgress)
-    board.cards(3).state should be(AnalysisDone)
-
-    board.cards(4).state should be(DevInProgress)
+    board.cards(0).state should be(ReadyToDeploy)
+    board.cards(1).state should be(Test)
+    board.cards(2).state should be(Test)
+    board.cards(3).state should be(Test)
+    board.cards(4).state should be(DevDone)
     board.cards(5).state should be(DevInProgress)
     board.cards(6).state should be(DevInProgress)
-    board.cards(7).state should be(DevDone)
-
-    board.cards(8).state should be(Test)
-    board.cards(9).state should be(Test)
-    board.cards(10).state should be(Test)
-
-    board.cards(11).state should be(ReadyToDeploy)
+    board.cards(7).state should be(DevInProgress)
+    board.cards(8).state should be(AnalysisDone)
+    board.cards(9).state should be(AnalysisInProgress)
+    board.cards(10).state should be(Ready)
+    board.cards(11).state should be(Ready)
   }
 
   "CandidateState" should "be DevInProgress when analysis work is completed" in {
